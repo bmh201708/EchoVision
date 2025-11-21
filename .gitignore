@@ -1,0 +1,22 @@
+# Large datasets and caches
+dataset/
+saved_models/
+soundfonts/
+
+# Generated artifacts
+output_vevo/
+log/
+
+# Common large binary formats
+*.mp4
+*.wav
+*.flac
+*.mid
+*.midi
+*.npz
+*.npy
+*.pickle
+*.pkl
+*.tar
+*.tar.gz
+*.zip
