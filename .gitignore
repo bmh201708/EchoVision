@@ -1,6 +1,7 @@
 # Large datasets and caches
 dataset/
 !dataset/prepare_dataset.ipynb
+!dataset/vevo/README.md
 saved_models/
 soundfonts/
 
