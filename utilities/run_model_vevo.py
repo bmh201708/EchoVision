@@ -18,23 +18,27 @@ def chord_id_to_root_attr(chord_id, chord_inv_dic=None, chord_root_dic=None, cho
     支持25种和弦（0-24）和157种和弦（0-156）
     """
     if chord_id == 0:
-        # N和弦
+        # N和弦（注意：在157种和弦模式下，N的ID可能是129，不是0）
+        if chord_inv_dic:
+            chord_name = chord_inv_dic.get(str(chord_id), "N")
+            if chord_name == "N" and chord_root_dic and chord_attr_dic:
+                return chord_root_dic.get("N", 12), chord_attr_dic.get("N", 13)
         if chord_root_dic and chord_attr_dic:
-            return chord_root_dic.get("N", 12), chord_attr_dic.get("N", 10)
-        return 12, 10  # 默认值
+            return chord_root_dic.get("N", 12), chord_attr_dic.get("N", 13)
+        return 12, 13  # 默认值
     elif chord_id == CHORD_END:
         return CHORD_ROOT_END, CHORD_ATTR_END
     elif chord_id == CHORD_PAD:
         return CHORD_ROOT_PAD, CHORD_ATTR_PAD
     else:
-        # 25种和弦：使用chord_inv.json来解析
-        if CHORD_END == 24 and chord_inv_dic and chord_root_dic and chord_attr_dic:
+        # 使用chord_inv.json来解析（支持25种和157种和弦）
+        if chord_inv_dic and chord_root_dic and chord_attr_dic:
             chord_name = chord_inv_dic.get(str(chord_id), "N")
             chord_arr = chord_name.split(":")
             if len(chord_arr) == 1:
                 if chord_arr[0] == "N":
                     root_id = chord_root_dic.get("N", 12)
-                    attr_id = chord_attr_dic.get("N", 10)
+                    attr_id = chord_attr_dic.get("N", 13)
                 else:
                     # maj和弦（无属性）
                     root_id = chord_root_dic.get(chord_arr[0], 0)
@@ -44,7 +48,7 @@ def chord_id_to_root_attr(chord_id, chord_inv_dic=None, chord_root_dic=None, cho
                 attr_id = chord_attr_dic.get(chord_arr[1], 0)
             return root_id, attr_id
         else:
-            # 157种和弦：使用原来的公式
+            # 如果没有字典，使用原来的公式（仅适用于严格按照公式分配的ID）
             rootindex = int((chord_id - 1) / 13) + 1
             attrindex = (chord_id - 1) % 13 + 1
             return rootindex, attrindex

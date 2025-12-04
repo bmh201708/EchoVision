@@ -366,8 +366,9 @@ class VevoDataset(Dataset):
             # apad: CHORD_PAD在索引25，所以索引24=0，索引25=1
             aend = [0] + [0,0]*11 + [0,1] + [0]  # 26个元素：索引24=1（CHORD_END），索引25=0
             apad = [0] + [0,0]*12 + [1]  # 26个元素：索引24=0，索引25=1（CHORD_PAD）
-        else:  # 157种和弦模式（原始）
-            # 157种和弦：N(0) + 12根音×13属性(1-156) + CHORD_END(157) + CHORD_PAD(158)
+        else:  # 157种和弦模式
+            # 157种和弦：N(0) + 12根音×13属性(1-156) = 157个和弦ID
+            # CHORD_PAD = 157, CHORD_SIZE = 158（包括0-157，共158个）
             #              maj dim sus4 min7 min sus2 aug dim7 maj6 hdim7 7 min6 maj7
             # 0. extcing : [1,0,1,0,0,0,0,0,0,0,1,0,0]
             # 1. fearful : [0,1,0,1,0,0,0,1,0,1,0,0,0]
@@ -375,15 +376,21 @@ class VevoDataset(Dataset):
             # 3. sad :     [0,0,0,1,1,1,0,0,0,0,0,0,0]
             # 4. relaxing: [1,0,0,0,0,0,0,0,1,0,0,0,1]
             # 5. neutral : [0,0,0,0,0,0,0,0,0,0,0,0,0]
-            a0 = [0]+[1,0,1,0,0,0,0,0,0,0,1,0,0]*12+[0,0]
-            a1 = [0]+[0,1,0,1,0,0,0,1,0,1,0,0,0]*12+[0,0]
-            a2 = [0]+[0,1,1,1,0,0,0,0,0,0,1,0,0]*12+[0,0]
-            a3 = [0]+[0,0,0,1,1,1,0,0,0,0,0,0,0]*12+[0,0]
-            a4 = [0]+[1,0,0,0,0,0,0,0,1,0,0,0,1]*12+[0,0]
-            a5 = [0]+[0,0,0,0,0,0,0,0,0,0,0,0,0]*12+[0,0]
+            # 结构：[N] + [12根音×13属性] + [CHORD_PAD] = 1 + 156 + 1 = 158
+            a0 = [0]+[1,0,1,0,0,0,0,0,0,0,1,0,0]*12+[0]
+            a1 = [0]+[0,1,0,1,0,0,0,1,0,1,0,0,0]*12+[0]
+            a2 = [0]+[0,1,1,1,0,0,0,0,0,0,1,0,0]*12+[0]
+            a3 = [0]+[0,0,0,1,1,1,0,0,0,0,0,0,0]*12+[0]
+            a4 = [0]+[1,0,0,0,0,0,0,0,1,0,0,0,1]*12+[0]
+            a5 = [0]+[0,0,0,0,0,0,0,0,0,0,0,0,0]*12+[0]
             
-            aend = [0]+[0,0,0,0,0,0,0,0,0,0,0,0,0]*12+[1,0]
-            apad = [0]+[0,0,0,0,0,0,0,0,0,0,0,0,0]*12+[0,1]
+            # CHORD_END在索引156，CHORD_PAD在索引157
+            # aend: 索引156=1（CHORD_END），索引157=0
+            # 结构：[0]*156 + [1] + [0] = 158个元素
+            aend = [0]*156 + [1] + [0]
+            # apad: 索引156=0，索引157=1（CHORD_PAD）
+            # 结构：[0]*157 + [1] = 158个元素
+            apad = [0]*157 + [1]
 
         a0_tensor = torch.tensor(a0)
         a1_tensor = torch.tensor(a1)
@@ -594,20 +601,23 @@ def compute_hits_k_root_attr(out_root, out_attr, tgt, k):
             else:
                 out[0, :, i] = out_root[0, :, 14] * out_attr[0, :, 15]
         else:
-            if CHORD_END == 24 and root_attr_to_chord:
-                # 25种和弦：查找对应的root和attr组合
-                # 需要反向查找：从chord_id找到root和attr
+            if root_attr_to_chord:
+                # 使用字典查找：从chord_id找到root和attr（支持25种和157种和弦）
                 chord_name = None
-                for name, cid in chord_dic.items():
-                    if cid == i:
-                        chord_name = name
-                        break
+                if chord_inv_dic:
+                    chord_name = chord_inv_dic.get(str(i), None)
+                if not chord_name:
+                    # 如果chord_inv_dic中没有，尝试从chord_dic中查找
+                    for name, cid in chord_dic.items():
+                        if cid == i:
+                            chord_name = name
+                            break
                 if chord_name:
                     chord_arr = chord_name.split(":")
                     if len(chord_arr) == 1:
                         if chord_arr[0] == "N":
                             root_id = chord_root_dic.get("N", 12)
-                            attr_id = chord_attr_dic.get("N", 10)
+                            attr_id = chord_attr_dic.get("N", 13)
                         else:
                             root_id = chord_root_dic.get(chord_arr[0], 0)
                             attr_id = chord_attr_dic.get("maj", 0)
@@ -618,7 +628,7 @@ def compute_hits_k_root_attr(out_root, out_attr, tgt, k):
                 else:
                     out[0, :, i] = 0.0
             else:
-                # 157种和弦：使用原来的公式
+                # 如果没有字典，使用原来的公式（仅适用于严格按照公式分配的ID）
                 rootindex = int((i - 1) / 13) + 1
                 attrindex = (i - 1) % 13 + 1
                 out[0, :, i] = out_root[0, :, rootindex] * out_attr[0, :, attrindex]
