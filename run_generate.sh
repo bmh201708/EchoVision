@@ -7,3 +7,4 @@ cd /home/jim/Video2Music
 conda activate v2m_train
 python generate.py "$@"
 
+

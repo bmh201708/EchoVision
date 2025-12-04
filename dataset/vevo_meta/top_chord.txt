@@ -1,4 +1,6 @@
 A#:7
+A#:aug
+A#:hdim7
 A#:m7
 A#:maj
 A#:maj6
@@ -8,6 +10,8 @@ A#:sus2
 A#:sus4
 A:7
 A:dim
+A:dim7
+A:hdim7
 A:m6
 A:m7
 A:maj
@@ -28,8 +32,11 @@ B:min
 B:sus2
 B:sus4
 C#:7
+C#:aug
 C#:dim
 C#:dim7
+C#:hdim7
+C#:m6
 C#:m7
 C#:maj
 C#:maj7
@@ -38,6 +45,7 @@ C#:sus2
 C#:sus4
 C:7
 C:aug
+C:hdim7
 C:m6
 C:m7
 C:maj
@@ -47,6 +55,7 @@ C:min
 C:sus2
 C:sus4
 D#:7
+D#:dim7
 D#:hdim7
 D#:m6
 D#:m7
@@ -54,7 +63,9 @@ D#:maj
 D#:maj6
 D#:maj7
 D#:min
+D#:sus4
 D:7
+D:hdim7
 D:m7
 D:maj
 D:maj6
@@ -63,14 +74,18 @@ D:min
 D:sus2
 D:sus4
 E:7
+E:aug
 E:dim
+E:m6
 E:m7
 E:maj
+E:maj6
 E:maj7
 E:min
 E:sus2
 E:sus4
 F#:7
+F#:aug
 F#:dim7
 F#:m7
 F#:maj
@@ -80,6 +95,10 @@ F#:min
 F#:sus2
 F#:sus4
 F:7
+F:aug
+F:dim
+F:dim7
+F:hdim7
 F:m6
 F:m7
 F:maj
@@ -89,6 +108,10 @@ F:min
 F:sus2
 F:sus4
 G#:7
+G#:aug
+G#:dim
+G#:dim7
+G#:hdim7
 G#:m6
 G#:m7
 G#:maj
@@ -98,6 +121,7 @@ G#:min
 G#:sus2
 G#:sus4
 G:7
+G:aug
 G:m6
 G:m7
 G:maj

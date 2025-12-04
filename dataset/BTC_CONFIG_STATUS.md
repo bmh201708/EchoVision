@@ -63,3 +63,4 @@ python test.py --audio_dir test --save_dir test_output --voca True
 - **BTC仓库**: `/home/jim/BTC-ISMIR19`
 - **预训练模型**: `~/BTC-ISMIR19/test/btc_model_large_voca.pt`
 
+

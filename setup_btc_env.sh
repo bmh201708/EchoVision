@@ -9,3 +9,4 @@ echo "BTC环境变量已设置:"
 echo "  BTC_PYTHON=$BTC_PYTHON"
 echo "  BTC_REPO_PATH=$BTC_REPO_PATH"
 
+
