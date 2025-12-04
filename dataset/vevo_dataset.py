@@ -11,6 +11,9 @@ from utilities.device import cpu_device
 from utilities.device import get_device
 
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 SEQUENCE_START = 0
 
@@ -160,7 +163,26 @@ class VevoDataset(Dataset):
                         feature_chordAttr[time] = 1
                 elif len(chord_arr) == 2:
                     chordRootID = self.chordRootDic[chord_arr[0]]
-                    chordAttrID = self.chordAttrDic[chord_arr[1]]
+                    # 处理属性别名：m7->m7, m6->m6, min7->m7, min6->m6, sus->sus4
+                    attr = chord_arr[1]
+                    attr_normalized = attr
+                    if attr == 'min7':
+                        attr_normalized = 'm7'
+                    elif attr == 'min6':
+                        attr_normalized = 'm6'
+                    elif attr == 'sus':
+                        attr_normalized = 'sus4'
+                    
+                    # 如果属性不在字典中，尝试使用默认值
+                    if attr_normalized in self.chordAttrDic:
+                        chordAttrID = self.chordAttrDic[attr_normalized]
+                    elif attr in self.chordAttrDic:
+                        chordAttrID = self.chordAttrDic[attr]
+                    else:
+                        # 如果都不存在，使用maj作为默认值
+                        logger.warning(f"未知和弦属性: {attr}, 使用默认值maj")
+                        chordAttrID = self.chordAttrDic.get('maj', 0)
+                    
                     feature_chordRoot[time] = chordRootID
                     feature_chordAttr[time] = chordAttrID
 

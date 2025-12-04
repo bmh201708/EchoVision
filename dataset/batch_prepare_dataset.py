@@ -817,8 +817,9 @@ class DatasetProcessor:
             
             labs = list(chord_root.glob('*.lab'))
             
-            # 扫描和弦集合
+            # 扫描和弦集合和属性集合
             chords = set()
+            attrs_found = set()
             ids = []
             for lab in labs:
                 ids.append(lab.stem)
@@ -826,7 +827,15 @@ class DatasetProcessor:
                     for line in f:
                         parts = line.strip().split()
                         if len(parts) >= 2 and parts[0] != 'key':
-                            chords.add(parts[1])
+                            chord = parts[1]
+                            chords.add(chord)
+                            # 提取属性
+                            if ':' in chord:
+                                attr = chord.split(':')[1]
+                                attrs_found.add(attr)
+                            elif chord != 'N':
+                                # 如果没有冒号，可能是根音（如'C'），属性为maj
+                                attrs_found.add('maj')
             
             ids = sorted(ids)
             chords = sorted(chords)
@@ -865,9 +874,30 @@ class DatasetProcessor:
             
             # 根/属性词典
             roots = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'N']
-            attrs = ['maj', 'min', 'dim', 'aug', 'sus', 'sus2', '7', 'maj7', 'min7', 'min6', 'N']
+            
+            # 基础13种和弦类型（论文要求）
+            base_attrs = ['maj', 'min', 'dim', 'aug', 'sus4', 'sus2', '7', 'maj7', 'm7', 'dim7', 'maj6', 'm6', 'hdim7', 'N']
+            # 添加找到的所有属性（包括变体）
+            all_attrs = list(base_attrs)
+            for attr in sorted(attrs_found):
+                # 处理属性别名映射
+                attr_normalized = attr
+                if attr == 'min7' or attr == 'm7':
+                    attr_normalized = 'm7'
+                elif attr == 'min6' or attr == 'm6':
+                    attr_normalized = 'm6'
+                elif attr == 'sus':
+                    attr_normalized = 'sus4'
+                elif attr not in all_attrs:
+                    all_attrs.append(attr_normalized)
+            
+            # 确保N在最后
+            if 'N' in all_attrs:
+                all_attrs.remove('N')
+            all_attrs.append('N')
+            
             root2id = {r: i for i, r in enumerate(roots)}
-            attr2id = {a: i for i, a in enumerate(attrs)}
+            attr2id = {a: i for i, a in enumerate(all_attrs)}
             
             (meta_root / 'chord_root.json').write_text(
                 json.dumps(root2id, ensure_ascii=False, indent=2), encoding='utf-8')
