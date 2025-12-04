@@ -23,16 +23,16 @@ import json
 
 from midi2audio import FluidSynth
 
-import moviepy.editor as mp
+# moviepy 2.x 版本：直接从 moviepy 导入，不再需要 moviepy.editor
+from moviepy import VideoFileClip, AudioFileClip, TextClip, CompositeVideoClip
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 import os, random, shutil
-from moviepy.editor import *
 import time
 
 version = VERSION
 split_ver = SPLIT_VER
 split_path = "split_" + split_ver
-test_id = "049"
+test_id = "015"
 num_prime_chord = 30
 
 is_voice = True
@@ -68,9 +68,10 @@ max_conseq_N = 0
 max_conseq_chord = 2
 
 def text_clip(text: str, duration: int, start_time: int = 0):
-    t = TextClip(text, font='Georgia-Regular', fontsize=24, color='white')
-    t = t.set_position(("center", 20)).set_duration(duration)
-    t = t.set_start(start_time)
+    # moviepy 2.x API: fontsize -> font_size, set_* -> with_*
+    t = TextClip(text=text, font_size=24, color='white', duration=duration)
+    t = t.with_position(("center", 20))
+    t = t.with_start(start_time)
     return t
 
 def convert_format_id_to_offset(id_list):
@@ -88,6 +89,7 @@ def convert_format_id_to_offset(id_list):
 def main():
     testFileList=[]
     valFileList=[]
+    trainFileList=[]
     
     with open('dataset/vevo_meta/split/'+ split_ver +'/test.txt') as txt_file:
         for line in txt_file:
@@ -95,6 +97,9 @@ def main():
     with open('dataset/vevo_meta/split/'+ split_ver +'/val.txt') as txt_file:
         for line in txt_file:
             valFileList.append(line.strip())
+    with open('dataset/vevo_meta/split/'+ split_ver +'/train.txt') as txt_file:
+        for line in txt_file:
+            trainFileList.append(line.strip())
     
     with open('dataset/vevo_meta/chord.json') as json_file:
         chordDic = json.load(json_file)
@@ -122,7 +127,7 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
 
-    _, val_dataset, test_dataset = create_vevo_datasets(
+    train_dataset, val_dataset, test_dataset = create_vevo_datasets(
             dataset_root = "./dataset/", 
             max_seq_chord = args.max_sequence_chord, 
             max_seq_video = args.max_sequence_video, 
@@ -134,10 +139,15 @@ def main():
     
     if test_id in testFileList:
         dataset = test_dataset
+        print(f"使用测试集: {test_id}")
     elif test_id in valFileList:
         dataset = val_dataset
+        print(f"使用验证集: {test_id}")
+    elif test_id in trainFileList:
+        dataset = train_dataset
+        print(f"使用训练集: {test_id}")
     else:
-        assert False, f"Test id: {args.test_id} not in test or val dataset"
+        assert False, f"Test id: {args.test_id} not found in any dataset split"
     
     total_vf_dim = 0
     if args.is_video:
@@ -159,10 +169,14 @@ def main():
     else:
         test_id_idx = -1
         for i in range( len(dataset) ):
-            if int(args.test_id) == int( dataset.data_files_chord[i].split("/")[-1][:3] ):
+            # 从文件路径中提取ID：dataset/vevo_chord/lab_v2_norm/all/049.lab -> 049
+            chord_file = dataset.data_files_chord[i]
+            file_id = chord_file.split("/")[-1].replace(".lab", "")
+            if str(args.test_id) == file_id:
                 test_id_idx = i
+                break
         if test_id_idx == -1:
-            assert False, f"Test id: {args.test_id} not in test dataset"
+            assert False, f"Test id: {args.test_id} not found in selected dataset"
 
     primer = dataset[test_id_idx]["x"].to(get_device())
     primer_root = dataset[test_id_idx]["x_root"].to(get_device())
@@ -662,16 +676,19 @@ def main():
             fs.midi_to_audio(f_path_midi, f_path_flac)
 
             # Render generated music into input video
-            audio=mp.AudioFileClip(f_path_flac)
-            video=mp.VideoFileClip(f_path_video)
-            audio = audio.subclip(0, video.duration )
-            final=video.set_audio(audio)
+            audio = AudioFileClip(f_path_flac)
+            video = VideoFileClip(f_path_video)
+            # moviepy 2.x 使用 subclipped 而不是 subclip
+            audio = audio.subclipped(0, video.duration)
+            # moviepy 2.x 使用 with_audio 而不是 set_audio
+            final = video.with_audio(audio)
             
             text_prime = text_clip("Prime Chords", args.num_prime_chord)
             text_gen = text_clip("Generated Chords", int(video.duration) - args.num_prime_chord, args.num_prime_chord)
 
             final_with_text = CompositeVideoClip([final, text_prime, text_gen])
-            final_with_text.write_videofile(f_path_video_out, 
+            final_with_text.write_videofile(
+                str(f_path_video_out), 
                 codec='libx264', 
                 audio_codec='aac', 
                 temp_audiofile='temp-audio.m4a', 

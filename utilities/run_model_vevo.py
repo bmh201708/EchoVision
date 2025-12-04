@@ -1,5 +1,6 @@
 import torch
 import time
+import os
 
 from .constants import *
 from utilities.device import get_device
@@ -10,6 +11,43 @@ from sklearn.metrics import confusion_matrix
 import json
 
 from dataset.vevo_dataset import compute_vevo_accuracy, compute_vevo_correspondence, compute_hits_k, compute_hits_k_root_attr, compute_vevo_accuracy_root_attr, compute_vevo_correspondence_root_attr
+
+def chord_id_to_root_attr(chord_id, chord_inv_dic=None, chord_root_dic=None, chord_attr_dic=None):
+    """
+    将和弦ID转换为root和attr ID
+    支持25种和弦（0-24）和157种和弦（0-156）
+    """
+    if chord_id == 0:
+        # N和弦
+        if chord_root_dic and chord_attr_dic:
+            return chord_root_dic.get("N", 12), chord_attr_dic.get("N", 10)
+        return 12, 10  # 默认值
+    elif chord_id == CHORD_END:
+        return CHORD_ROOT_END, CHORD_ATTR_END
+    elif chord_id == CHORD_PAD:
+        return CHORD_ROOT_PAD, CHORD_ATTR_PAD
+    else:
+        # 25种和弦：使用chord_inv.json来解析
+        if CHORD_END == 24 and chord_inv_dic and chord_root_dic and chord_attr_dic:
+            chord_name = chord_inv_dic.get(str(chord_id), "N")
+            chord_arr = chord_name.split(":")
+            if len(chord_arr) == 1:
+                if chord_arr[0] == "N":
+                    root_id = chord_root_dic.get("N", 12)
+                    attr_id = chord_attr_dic.get("N", 10)
+                else:
+                    # maj和弦（无属性）
+                    root_id = chord_root_dic.get(chord_arr[0], 0)
+                    attr_id = chord_attr_dic.get("maj", 0)
+            else:
+                root_id = chord_root_dic.get(chord_arr[0], 0)
+                attr_id = chord_attr_dic.get(chord_arr[1], 0)
+            return root_id, attr_id
+        else:
+            # 157种和弦：使用原来的公式
+            rootindex = int((chord_id - 1) / 13) + 1
+            attrindex = (chord_id - 1) % 13 + 1
+            return rootindex, attrindex
 
 def train_epoch(cur_epoch, model, dataloader, 
                 train_loss_func, train_loss_emotion_func,
@@ -303,21 +341,31 @@ def eval_model(model, dataloader,
                         pred_root = []
                         pred_attr = []
 
+                        # 加载字典文件（如果需要）
+                        dataset_root = "./dataset/"
+                        chord_inv_dic = None
+                        chord_root_dic = None
+                        chord_attr_dic = None
+                        if CHORD_END == 24:  # 25种和弦模式
+                            try:
+                                chord_inv_path = os.path.join(dataset_root, "vevo_meta/chord_inv.json")
+                                chord_root_path = os.path.join(dataset_root, "vevo_meta/chord_root.json")
+                                chord_attr_path = os.path.join(dataset_root, "vevo_meta/chord_attr.json")
+                                with open(chord_inv_path) as f:
+                                    chord_inv_dic = json.load(f)
+                                with open(chord_root_path) as f:
+                                    chord_root_dic = json.load(f)
+                                with open(chord_attr_path) as f:
+                                    chord_attr_dic = json.load(f)
+                            except:
+                                pass  # 如果加载失败，使用默认逻辑
+
                         for i in pred:
-                            if i == 0:
-                                pred_root.append(0)
-                                pred_attr.append(0)
-                            elif i == 157:
-                                pred_root.append(CHORD_ROOT_END)
-                                pred_attr.append(CHORD_ATTR_END)
-                            elif i == 158:
-                                pred_root.append(CHORD_ROOT_PAD)
-                                pred_attr.append(CHORD_ATTR_PAD)
-                            else:
-                                rootindex =  int( (i-1)/13 ) + 1
-                                attrindex =  (i-1)%13 + 1
-                                pred_root.append(rootindex)
-                                pred_attr.append(attrindex)
+                            root_id, attr_id = chord_id_to_root_attr(
+                                i, chord_inv_dic, chord_root_dic, chord_attr_dic
+                            )
+                            pred_root.append(root_id)
+                            pred_attr.append(attr_id)
                         
                         pred_root = np.array(pred_root)
                         pred_attr = np.array(pred_attr)

@@ -151,9 +151,9 @@ class VideoMusicTransformer(nn.Module):
                 gen_seq = gen_seq[beam_rows, :]
                 gen_seq[..., cur_i] = beam_cols
             else:
-                # token_probs.shape : [1, 157] 
-                # 0: N, 1: C, ... , 156: B:maj7
-                # 157 chordEnd 158 padding
+                # token_probs.shape : [1, CHORD_SIZE] 
+                # 0: N, 1: C, ... , CHORD_END-1: last chord
+                # CHORD_END: chordEnd, CHORD_PAD: padding
                 if max_conseq_N == 0:
                     token_probs[0][0] = 0.0
                 isMaxChord = True

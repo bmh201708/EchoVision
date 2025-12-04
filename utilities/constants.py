@@ -47,7 +47,7 @@ VIS_MODELS_PATH = vis_abbr_path
 VIS_MODELS_SORTED = " ".join(vis_arr)
 
 # CHORD
-CHORD_END               = 157
+CHORD_END               = 24  # 25种和弦：0-24 (12×maj + 12×min + N)
 CHORD_PAD               = CHORD_END + 1 
 CHORD_SIZE              = CHORD_PAD + 1
 
