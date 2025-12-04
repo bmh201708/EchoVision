@@ -1,15 +1,40 @@
 # Large datasets and caches
-dataset/
-!dataset/prepare_dataset.ipynb
+# dataset/ 目录：忽略所有数据文件，但跟踪脚本和文档
+dataset/vevo/*.mp4
+dataset/vevo_audio/
+dataset/vevo_frame/
+dataset/vevo_motion/
+dataset/vevo_semantic/
+dataset/vevo_emotion/
+dataset/vevo_scene/
+dataset/vevo_scene_offset/
+dataset/vevo_chord/
+dataset/vevo_loudness/
+dataset/vevo_midi/
+dataset/vevo_note_density/
+dataset/MuVi-Sync/
+dataset/MuVi-Sync.tar.gz
+dataset/__pycache__/
+dataset/.ipynb_checkpoints/
+dataset/*.log
+dataset/._*
+# 但跟踪 dataset 下的脚本和文档
+!dataset/*.py
+!dataset/*.md
+!dataset/*.ipynb
 !dataset/vevo/README.md
+!dataset/vevo_meta/
+
 saved_models/
 soundfonts/
+MuVi-Sync/
 
 # Generated artifacts
 output_vevo/
 log/
+*.log
 
-# Common large binary formats
+# Common large binary formats (但允许项目根目录下的某些文件)
 *.mp4
 *.wav
 *.flac
@@ -22,3 +47,26 @@ log/
 *.tar
 *.tar.gz
 *.zip
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
