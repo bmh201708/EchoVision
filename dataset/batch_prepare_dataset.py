@@ -54,14 +54,20 @@ VEVO_DIR = DATASET_ROOT / 'vevo'
 OMNI_PYTHON = '/home/jim/anaconda3/envs/omni/bin/python'
 FFI_PATH = '/lib/x86_64-linux-gnu/libffi.so.7'
 
+# BTC 环境配置（已配置，可通过环境变量覆盖）
+BTC_PYTHON = os.environ.get('BTC_PYTHON', '/home/jim/anaconda3/envs/btc/bin/python')
+BTC_REPO_PATH = Path(os.environ.get('BTC_REPO_PATH', '/home/jim/BTC-ISMIR19'))
+
 
 class DatasetProcessor:
     """数据集处理器"""
     
-    def __init__(self, skip_existing: bool = False, skip_steps: Set[str] = None, preserve_splits: bool = False):
+    def __init__(self, skip_existing: bool = False, skip_steps: Set[str] = None, 
+                 preserve_splits: bool = False, chord_method: str = 'omnizart'):
         self.skip_existing = skip_existing
         self.skip_steps = skip_steps or set()
         self.preserve_splits = preserve_splits
+        self.chord_method = chord_method.lower()
         self.processed_count = 0
         self.failed_count = 0
         self.failed_videos = []
@@ -538,6 +544,82 @@ class DatasetProcessor:
             logger.error(f"  [{video_id}] ✗ 和弦识别失败: {e}")
             return False
     
+    def extract_chord_btc(self, video_id: str) -> bool:
+        """6.3 使用 BTC 模型进行和弦识别（13种和弦类型）"""
+        if 'chord' in self.skip_steps:
+            return True
+            
+        try:
+            # 尝试相对导入，如果失败则尝试绝对导入
+            try:
+                from .btc_chord_processor import process_btc_chords
+            except ImportError:
+                from btc_chord_processor import process_btc_chords
+            
+            chord_dir = DATASET_ROOT / 'vevo_chord' / 'lab_v2_norm' / 'all'
+            chord_dir.mkdir(parents=True, exist_ok=True)
+            chord_path = chord_dir / f'{video_id}.lab'
+            
+            if self.skip_existing and chord_path.exists():
+                logger.info(f"  [{video_id}] 跳过BTC和弦识别（已存在）")
+                return True
+            
+            wav_path = DATASET_ROOT / 'vevo_audio' / 'wav' / f'{video_id}.wav'
+            if not wav_path.exists():
+                logger.warning(f"  [{video_id}] WAV 文件不存在，跳过BTC和弦识别")
+                return False
+            
+            if not os.path.exists(BTC_PYTHON) or BTC_PYTHON == '/path/to/btc/env/bin/python':
+                logger.error(f"  [{video_id}] BTC Python 路径未配置或不存在: {BTC_PYTHON}")
+                logger.error(f"  请设置环境变量 BTC_PYTHON 和 BTC_REPO_PATH，或修改 batch_prepare_dataset.py 中的配置")
+                return False
+            
+            if not BTC_REPO_PATH.exists() or str(BTC_REPO_PATH) == '/path/to/BTC-ISMIR19':
+                logger.error(f"  [{video_id}] BTC 仓库路径未配置或不存在: {BTC_REPO_PATH}")
+                logger.error(f"  请设置环境变量 BTC_REPO_PATH，或修改 batch_prepare_dataset.py 中的配置")
+                return False
+            
+            # 检查是否有MIDI文件用于调性归一化
+            midi_path = DATASET_ROOT / 'vevo_midi' / 'all' / f'{video_id}.mid'
+            midi_path = midi_path if midi_path.exists() else None
+            
+            success, output_path = process_btc_chords(
+                wav_path=wav_path,
+                output_dir=chord_dir,
+                video_id=video_id,
+                btc_python=BTC_PYTHON,
+                btc_repo_path=BTC_REPO_PATH,
+                midi_path=midi_path,
+                normalize_key=True
+            )
+            
+            if success:
+                logger.info(f"  [{video_id}] ✓ BTC和弦识别完成（13种和弦类型）")
+                return True
+            else:
+                logger.warning(f"  [{video_id}] BTC识别失败，使用占位和弦")
+                # 生成占位和弦
+                from pydub import AudioSegment
+                from math import ceil
+                audio = AudioSegment.from_file(wav_path)
+                dur_sec = ceil(len(audio) / 1000)
+                with open(chord_path, 'w', encoding='utf-8') as f:
+                    f.write('key C major\n')
+                    for t in range(dur_sec):
+                        f.write(f'{t} N\n')
+                logger.info(f"  [{video_id}] ✓ 已生成占位和弦")
+                return True
+                
+        except ImportError as e:
+            logger.error(f"  [{video_id}] ✗ BTC处理器导入失败: {e}")
+            logger.error(f"  请确保 btc_chord_processor.py 文件存在")
+            return False
+        except Exception as e:
+            logger.error(f"  [{video_id}] ✗ BTC和弦识别失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
+    
     def generate_midi(self, video_id: str) -> bool:
         """6.4 生成 MIDI"""
         if 'midi' in self.skip_steps:
@@ -881,7 +963,7 @@ class DatasetProcessor:
             ('分镜', self.extract_scene),
             ('音频提取', self.extract_audio),
             ('响度特征', self.extract_loudness),
-            ('和弦识别', self.extract_chord_omnizart),
+            ('和弦识别', self.extract_chord_omnizart if self.chord_method == 'omnizart' else self.extract_chord_btc),
             ('MIDI 生成', self.generate_midi),
             ('Note Density', self.extract_note_density),
         ]
@@ -968,6 +1050,9 @@ def main():
                        help='并行处理的视频数量（默认：1，串行处理）')
     parser.add_argument('--preserve-splits', action='store_true',
                        help='保持现有的训练/验证/测试集划分，新视频按8:1:1比例分配')
+    parser.add_argument('--chord-method', type=str, default='omnizart',
+                       choices=['omnizart', 'btc'],
+                       help='和弦识别方法：omnizart（25种和弦）或 btc（13种和弦类型）')
     
     args = parser.parse_args()
     
@@ -976,7 +1061,8 @@ def main():
     processor = DatasetProcessor(
         skip_existing=args.skip_existing,
         skip_steps=skip_steps,
-        preserve_splits=args.preserve_splits
+        preserve_splits=args.preserve_splits,
+        chord_method=args.chord_method
     )
     
     video_ids = [args.video_id] if args.video_id else None
